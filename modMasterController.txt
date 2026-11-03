@@ -43,6 +43,7 @@ Public Sub executeMasterProcess()
     Dim filePaths As Variant
     Dim fondslisteArr As Variant
     Dim inputDataArr As Variant
+    Dim includeSetupFunds As Boolean
     Dim kvgProcessedIndex As Long
     Dim lastRow As Long
     Dim originalCalculation As Excel.XlCalculation
@@ -128,10 +129,13 @@ Public Sub executeMasterProcess()
 
     If Not runAll Then
         targetKvg = Trim$(CStr(wsMacro.Range("kvg_name").Value))
-        Set clientDict = buildClientDictFromArray(fondslisteArr, targetKvg)
+        includeSetupFunds = readIncludeSetupFundsFlag(wsMacro)
+        Set clientDict = buildClientDictFromArray(fondslisteArr, targetKvg, includeSetupFunds)
 
         If clientDict.Count = 0 Then
-            Err.Raise 1001, METHOD_NAME, "No OPEN funds for KVG: " & targetKvg
+            Err.Raise 1001, METHOD_NAME, _
+                      "No eligible funds for KVG: " & targetKvg & _
+                      " (OPEN plus SETUP when include_setup_funds=TRUE)."
         End If
 
         Call progressStartKvg(1, targetKvg)
@@ -176,7 +180,8 @@ Public Sub executeMasterProcess()
                 Call WaitForCalculationComplete(METHOD_NAME)
 
                 targetKvg = Trim$(CStr(wsMap.Cells(rowIndex, "U").Value))
-                Set clientDict = buildClientDictFromArray(fondslisteArr, targetKvg)
+                includeSetupFunds = readIncludeSetupFundsFlag(wsMacro)
+                Set clientDict = buildClientDictFromArray(fondslisteArr, targetKvg, includeSetupFunds)
 
                 If clientDict.Count > 0 Then
                     kvgProcessedIndex = kvgProcessedIndex + 1
@@ -646,6 +651,7 @@ Private Function runProcessForClient(ByVal clientName As String, _
     Dim childDict As Object
     Dim childFileName As String
     Dim childKvg As String
+    Dim childIncludeSetup As Boolean
     Dim childPdfXlsxPrefix As String
     Dim childRow As Long
     Dim clientStats As String
@@ -762,6 +768,7 @@ Private Function runProcessForClient(ByVal clientName As String, _
     ownCsvNr = readChildBoolean(wsMacro, "child_use_own_csv_nr")
     ownPaths = readChildBoolean(wsMacro, "child_use_own_paths")
     childCsvNr = CStr(wsMacro.Range("csv_name_nr").Value)
+    childIncludeSetup = readIncludeSetupFundsFlag(wsMacro)
     attachFilteredChild = readChildBoolean(wsMacro, "attach_filtered_input_to_email")
     childResultsXlsxPath = CStr(wsMacro.Range("results_path_xlsx").Value)
     childArchiveXlsxPath = CStr(wsMacro.Range("archive_path_xlsx").Value)
@@ -776,7 +783,7 @@ Private Function runProcessForClient(ByVal clientName As String, _
         childArchiveXlsxPath = parentArchiveXlsxPath
     End If
 
-    Set childDict = buildClientDictFromArray(fondsArr, childKvg)
+    Set childDict = buildClientDictFromArray(fondsArr, childKvg, childIncludeSetup)
     Set eligibilityDict = mergeDictionaries(cDict, childDict)
 
     If Not HasEligibleTransactionsForDictionary(inArr, eligibilityDict, inclFreeOfPayment) Then
@@ -1343,6 +1350,54 @@ End Function
 
 '-------------------------------------------------------------------------------
 ' Author:        Pawel Ligezka
+' Creation date: 2026-11-03
+' Parameters:    wsMacro As Excel.Worksheet
+' Returns:       Boolean
+' Description:   Returns TRUE when include_setup_funds is enabled. A missing named range defaults to FALSE for backward compatibility.
+'-------------------------------------------------------------------------------
+Private Function readIncludeSetupFundsFlag(ByRef wsMacro As Excel.Worksheet) As Boolean
+    Const METHOD_NAME As String = "readIncludeSetupFundsFlag"
+    Dim errorManager As New ErrorManager
+    Dim errDescription As String
+    Dim errNumber As Long
+    Dim normalizedValue As String
+    Dim value As Variant
+
+    On Error GoTo MissingOrInvalidFlag
+
+    value = wsMacro.Range("include_setup_funds").Value
+    normalizedValue = UCase$(Trim$(CStr(value)))
+
+    readIncludeSetupFundsFlag = _
+        normalizedValue = "TRUE" _
+        Or normalizedValue = "PRAWDA" _
+        Or normalizedValue = "1" _
+        Or normalizedValue = "TAK"
+
+ExitFunction:
+    Exit Function
+
+MissingOrInvalidFlag:
+    errNumber = VBA.Err.Number
+    errDescription = VBA.Err.Description
+    readIncludeSetupFundsFlag = False
+
+    If errNumber = 1004 Then
+        VBA.Err.Clear
+        Resume ExitFunction
+    End If
+
+    errorManager.addError _
+        CLASS_NAME, _
+        METHOD_NAME, _
+        errNumber, _
+        errDescription
+    errorManager.save
+    Resume ExitFunction
+End Function
+
+'-------------------------------------------------------------------------------
+' Author:        Pawel Ligezka
 ' Creation date: 2026-08-05
 ' Parameters:    d1 As Object, d2 As Object
 ' Returns:       Object
@@ -1688,12 +1743,13 @@ End Function
 '-------------------------------------------------------------------------------
 ' Author:        Pawel Ligezka
 ' Creation date: 2026-08-05
-' Parameters:    dataArr As Variant, targetKvg As String
+' Parameters:    dataArr As Variant, targetKvg As String, includeSetupFunds As Boolean (optional)
 ' Returns:       Object
-' Description:   Returns OPEN funds belonging to one KVG as a fund-name dictionary.
+' Description:   Returns eligible funds for one KVG. OPEN is always included; SETUP is included only when configured.
 '-------------------------------------------------------------------------------
 Public Function buildClientDictFromArray(ByRef dataArr As Variant, _
-                                         ByVal targetKvg As String) As Object
+                                         ByVal targetKvg As String, _
+                                         Optional ByVal includeSetupFunds As Boolean = False) As Object
     Const METHOD_NAME As String = "buildClientDictFromArray"
     Dim cleanId As String
     Dim currentKvg As String
@@ -1716,7 +1772,8 @@ Public Function buildClientDictFromArray(ByRef dataArr As Variant, _
         statusValue = UCase$(Trim$(CStr(dataArr(rowIndex, 2))))
         currentKvg = UCase$(Trim$(CStr(dataArr(rowIndex, 9))))
 
-        If statusValue = "OPEN" And currentKvg = UCase$(targetKvg) Then
+        If (statusValue = "OPEN" Or (includeSetupFunds And statusValue = "SETUP")) _
+            And currentKvg = UCase$(targetKvg) Then
             cleanId = Right$(Replace$(CStr(dataArr(rowIndex, 14)), " ", vbNullString), 11)
 
             If Not dict.Exists(cleanId) Then
