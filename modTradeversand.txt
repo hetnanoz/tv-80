@@ -408,12 +408,13 @@ End Sub
 '-------------------------------------------------------------------------------
 ' Author:        Pawel Ligezka
 ' Creation date: 2026-08-04
-' Parameters:    ByVal folderPath As String, ByVal baseName As String, ByVal kvgToMatch As String, ByRef dictSkipped As Object
+' Parameters:    ByVal folderPath As String, ByVal baseName As String, ByVal kvgToMatch As String, ByRef dictSkipped As Object, includeSetupFunds As Boolean (optional)
 ' Returns:       Object
 ' Description:   Reads the latest Fondsliste and returns the fund mapping for the requested KVG.
 '-------------------------------------------------------------------------------
 Public Function getMappingFromFondsliste(ByVal folderPath As String, ByVal baseName As String, ByVal kvgToMatch As String, _
-                                  ByRef dictSkipped As Object) As Object
+                                  ByRef dictSkipped As Object, _
+                                  Optional ByVal includeSetupFunds As Boolean = False) As Object
     Const METHOD_NAME As String = "getMappingFromFondsliste"
     Dim errorManager As New ErrorManager
     Dim errDescription As String
@@ -472,7 +473,7 @@ Public Function getMappingFromFondsliste(ByVal folderPath As String, ByVal baseN
             status = Trim(safeString(dataArr(i, 2)))
             currentKvg = Trim(safeString(dataArr(i, 9)))
 
-            If UCase(status) = "OPEN" Then
+            If UCase(status) = "OPEN" Or (includeSetupFunds And UCase(status) = "SETUP") Then
                 rawID = Replace(safeString(dataArr(i, 14)), " ", "")
                 If Len(rawID) >= 11 Then
                     cleanID = Right(rawID, 11)
@@ -2389,7 +2390,7 @@ End Function
 ' Creation date: 2026-08-04
 ' Parameters:    ByRef fondsArr As Variant
 ' Returns:       Object
-' Description:   Builds the Depot number to external fund number mapping.
+' Description:   Builds the Depot number to external fund number mapping for OPEN and SETUP funds.
 '-------------------------------------------------------------------------------
 Public Function buildDepotnrToExterneFondNrMap(ByRef fondsArr As Variant) As Object
     Const METHOD_NAME As String = "buildDepotnrToExterneFondNrMap"
@@ -2414,7 +2415,8 @@ Public Function buildDepotnrToExterneFondNrMap(ByRef fondsArr As Variant) As Obj
     lastRow = UBound(fondsArr, 1)
 
     For r = 2 To lastRow
-        If UCase(Trim(safeString(fondsArr(r, 2)))) = "OPEN" Then
+        If UCase(Trim(safeString(fondsArr(r, 2)))) = "OPEN" _
+            Or UCase(Trim(safeString(fondsArr(r, 2)))) = "SETUP" Then
             depotnrKey = Trim(safeString(fondsArr(r, 14)))
             externeFondNr = Trim(safeString(fondsArr(r, 27)))
             If depotnrKey <> "" And externeFondNr <> "" Then
@@ -3179,7 +3181,7 @@ End Function
 ' Creation date: 2026-08-04
 ' Parameters:    ByRef fArr As Variant
 ' Returns:       Object
-' Description:   Builds the Depot number to fund description mapping.
+' Description:   Builds the Depot number to fund description mapping for OPEN and SETUP funds.
 '-------------------------------------------------------------------------------
 Public Function buildFondsbezeichnungMap(ByRef fArr As Variant) As Object
     Const METHOD_NAME As String = "buildFondsbezeichnungMap"
@@ -3203,7 +3205,8 @@ Public Function buildFondsbezeichnungMap(ByRef fArr As Variant) As Object
 
     lastRow = UBound(fArr, 1)
     For r = 2 To lastRow
-        If UCase(Trim(safeString(fArr(r, 2)))) = "OPEN" Then
+        If UCase(Trim(safeString(fArr(r, 2)))) = "OPEN" _
+            Or UCase(Trim(safeString(fArr(r, 2)))) = "SETUP" Then
             depotnrKey = Replace(Trim(safeString(fArr(r, 14))), " ", "")
             If Len(depotnrKey) >= 11 Then depotnrKey = Right(depotnrKey, 11)
 
