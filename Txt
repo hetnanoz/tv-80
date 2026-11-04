@@ -1,0 +1,11 @@
+Slide 1 — Introduction
+Alongside my daily NAV work, I focused on improving processes, reducing manual work and preventing operational issues. Here are the main projects and what I learned.
+Slide 2 — Daily process improvements
+I updated 2SDoc with a targeted second audit-backup check and automatic follow-up emails. I built Advice Flow to track Corporate Action advices and prevent missed releases. For AGI formblatts, Power Automate saves backups and sends booking alerts.
+Slide 3 — Automation
+Dallas Cash Transactions Combiner consolidates Outlook files, assigns transactions and prepares team reports. I completed the Agency Lending Fee Tool for Helaba and Teams 10 and 11. I designed both to handle missing files, unexpected data and different user setups.
+Slide 4 — Client reporting and development
+Tradeversand improved reporting completeness. Helaba remains in progress, and I support Team 6. Coupon investigations and Fund Accounting trainings deepened my knowledge of ISIN setups, bonds, derivatives, corporate actions and NAV bookings. I also achieved a strong test result.
+PDP meetings with Mariusz taught me to improve a process before adding new controls. We discussed root causes, risk-proportionate checks, the three lines of defence and BIA/BCP.
+Slide 5 — What I learned
+Overall, these projects and trainings deepened my Fund Accounting knowledge and taught me to think ahead and improve processes at the source. Supporting current and former graduates helped me learn as well: explaining tasks and answering questions gave me a clearer understanding of our daily processes. My takeaway: understand the process, solve problems at the source and prevent issues before they happen.
