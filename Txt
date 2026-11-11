@@ -1,11 +1,47 @@
-Slide 1 — Introduction
-Alongside my daily NAV work, I focused on improving processes, reducing manual work and preventing operational issues. Here are the main projects and what I learned.
-Slide 2 — Daily process improvements
-I updated 2SDoc with a targeted second audit-backup check and automatic follow-up emails. I built Advice Flow to track Corporate Action advices and prevent missed releases. For AGI formblatts, Power Automate saves backups and sends booking alerts.
-Slide 3 — Automation
-Dallas Cash Transactions Combiner consolidates Outlook files, assigns transactions and prepares team reports. I completed the Agency Lending Fee Tool for Helaba and Teams 10 and 11. I designed both to handle missing files, unexpected data and different user setups.
-Slide 4 — Client reporting and development
-Tradeversand improved reporting completeness. Helaba remains in progress, and I support Team 6. Coupon investigations and Fund Accounting trainings deepened my knowledge of ISIN setups, bonds, derivatives, corporate actions and NAV bookings. I also achieved a strong test result.
-PDP meetings with Mariusz taught me to improve a process before adding new controls. We discussed root causes, risk-proportionate checks, the three lines of defence and BIA/BCP.
-Slide 5 — What I learned
-Overall, these projects and trainings deepened my Fund Accounting knowledge and taught me to think ahead and improve processes at the source. Supporting current and former graduates helped me learn as well: explaining tasks and answering questions gave me a clearer understanding of our daily processes. My takeaway: understand the process, solve problems at the source and prevent issues before they happen.
+Hi NeoLink Support,
+
+we are currently reviewing the transaction reporting provided to one of our clients and would like to ask you to check whether two additional data enhancements could be made available in NeoLink and, most importantly, in report CNOT_ALL001, which we use as the source for the client reporting.
+
+The client needs to be able to mathematically reconcile the reported transaction amounts. During our analysis, we identified two points where additional source information would be very helpful:
+
+1. Full price precision
+
+Could you please check whether it would be possible to provide the transaction price with the full available precision, without limiting or rounding the number of decimal places?
+
+For some transactions, the price currently available in CNOT_ALL001 appears to be rounded, which results in small differences when the client recalculates the gross amount based on quantity × price.
+
+If a more precise price is available in the source system, we would therefore appreciate it if the full value could be included in the report.
+
+2. Factor / pool factor
+
+Could you also please check whether the applicable factor could be provided for transactions where such a factor is relevant?
+
+As an example, we identified the following transaction:
+
+ISIN: XS2724532333
+Security: AMS-OSRAM AG 10.5P 23-300329
+Quantity: 300,000 FAMT
+Price: 104.847%
+
+In NeoLink, the transaction details show the price and settlement amounts, but there is no indication that a factor applies.
+
+[NeoLink screenshot]
+
+However, in the relevant WM security master data, a pool factor of 0.7073171 is available:
+
+[WM screenshot]
+
+This factor is required to reconcile the gross amount correctly. Without it, a calculation based on nominal × price / 100 produces a materially different result.
+
+We have also attached the transaction example for reference.
+
+Our preferred solution would be to have both the full available price precision and the applicable factor / pool factor included directly in CNOT_ALL001.
+
+If adding the factor to CNOT_ALL001 is not possible, could you also please let us know whether there is another standard NeoLink report, preferably available in XLSX format, which already contains the factor information together with the relevant transaction details? Such a report could potentially serve as an alternative data source for us.
+
+As this is a specific client requirement, we would be very grateful if you could investigate the available options.
+
+Thank you very much in advance for your support.
+
+Best regards,
+Pawel
