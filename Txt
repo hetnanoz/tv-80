@@ -1,1 +1,1 @@
-if(empty(outputs('Config')?['LastRunUtc']), addDays(utcNow(), -1), addMinutes(outputs('Config')?['LastRunUtc'], -5))
+@greater(ticks(item()?['receivedDateTime']), ticks(outputs('Since')))
