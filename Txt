@@ -1,1 +1,23 @@
-convertFromUtc(formatDateTime(items('For_each_email')?['receivedDateTime'], 'yyyy-MM-ddTHH:mm:ssZ'), 'Central European Standard Time', 'yyyy-MM-ddTHH:mm:ss')
+concat('Title eq ''', replace(items('For_each_email')?['internetMessageId'], '''', ''''''), ''' and Status eq ''Saved''')
+
+
+Pole
+Wyrażenie (fx)
+Title (MessageId)
+items('For_each_email')?['internetMessageId']
+Team
+outputs('Config')?['Title']
+ReceivedAt
+items('For_each_email')?['receivedDateTime']
+MailFrom
+items('For_each_email')?['from']
+MailSubject
+substring(coalesce(items('For_each_email')?['subject'], ''), 0, min(255, length(coalesce(items('For_each_email')?['subject'], ''))))
+RuleId
+outputs('Rule')?['Title']
+Category
+outputs('Rule')?['Category']?['Value']
+FilesSaved
+length(body('Matching_attachments'))
+FilePaths
+outputs('Target_path')
