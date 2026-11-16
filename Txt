@@ -1,23 +1,40 @@
+A. Sprawdzenie, czy mail był już zapisany. Wewnątrz For_each_email, nad Rule_candidates (kliknij + na strzałce między For each email a Rule candidates):
+
+Get items (SharePoint), nazwa Get_log_entry
+Site Address: BSO FA, List Name: MailRouting_Log
+Filter Query: kliknij w pole, potem fx:
 concat('Title eq ''', replace(items('For_each_email')?['internetMessageId'], '''', ''''''), ''' and Status eq ''Saved''')
+Top Count: 1
+W Has_match kliknij + Add row i dodaj drugi wiersz (między wierszami musi być And):
+Lewa strona (fx): length(body('Get_log_entry'))
+Operator: is equal to
+Prawa strona: 0
 
+B. Wpis do logu po zapisie plików. W gałęzi True, pod pętlą For_each_attachment, czyli poza nią, ale nadal w True:
 
-Pole
-Wyrażenie (fx)
-Title (MessageId)
-items('For_each_email')?['internetMessageId']
-Team
-outputs('Config')?['Title']
-ReceivedAt
-items('For_each_email')?['receivedDateTime']
-MailFrom
-items('For_each_email')?['from']
-MailSubject
-substring(coalesce(items('For_each_email')?['subject'], ''), 0, min(255, length(coalesce(items('For_each_email')?['subject'], ''))))
-RuleId
-outputs('Rule')?['Title']
-Category
-outputs('Rule')?['Category']?['Value']
-FilesSaved
-length(body('Matching_attachments'))
-FilePaths
-outputs('Target_path')
+Create item (SharePoint), nazwa Log_saved
+Site Address: BSO FA, List Name: MailRouting_Log
+Kliknij Show all, wtedy pokażą się wszystkie kolumny. Uzupełnij je przez fx:
+Pole	Wyrażenie (fx)
+Title (MessageId)	items('For_each_email')?['internetMessageId']
+Team	outputs('Config')?['Title']
+ReceivedAt	items('For_each_email')?['receivedDateTime']
+MailFrom	items('For_each_email')?['from']
+MailSubject	substring(coalesce(items('For_each_email')?['subject'], ''), 0, min(255, length(coalesce(items('For_each_email')?['subject'], ''))))
+RuleId	outputs('Rule')?['Title']
+Category	outputs('Rule')?['Category']?['Value']
+FilesSaved	length(body('Matching_attachments'))
+FilePaths	outputs('Target_path')
+Status: wybierz z listy Saved. Wyrażenie nie jest tu potrzebne.
+Pola UnmatchedAttachments, Notes, Error i RunLink zostaw na razie puste.
+
+C. Zapamiętanie ostatniego uruchomienia. Na samym końcu flow, pod pętlą For_each_folder, czyli poza wszystkimi pętlami (dolny + na schemacie):
+
+Update item (SharePoint), nazwa Save_last_run
+Site Address: BSO FA, List Name: MailRouting_Config
+Id (fx): outputs('Config')?['ID']
+Pola wymagane muszą być uzupełnione, inaczej Update item zgłosi błąd:
+Team / Title (fx): outputs('Config')?['Title']
+Mailbox (fx): outputs('Config')?['Mailbox']
+BaseFolder (fx): outputs('Config')?['BaseFolder']
+LastRunUtc (fx): outputs('Run_start')
