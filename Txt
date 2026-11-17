@@ -1,40 +1,84 @@
-A. Sprawdzenie, czy mail był już zapisany. Wewnątrz For_each_email, nad Rule_candidates (kliknij + na strzałce między For each email a Rule candidates):
-
-Get items (SharePoint), nazwa Get_log_entry
-Site Address: BSO FA, List Name: MailRouting_Log
-Filter Query: kliknij w pole, potem fx:
-concat('Title eq ''', replace(items('For_each_email')?['internetMessageId'], '''', ''''''), ''' and Status eq ''Saved''')
-Top Count: 1
-W Has_match kliknij + Add row i dodaj drugi wiersz (między wierszami musi być And):
-Lewa strona (fx): length(body('Get_log_entry'))
-Operator: is equal to
-Prawa strona: 0
-
-B. Wpis do logu po zapisie plików. W gałęzi True, pod pętlą For_each_attachment, czyli poza nią, ale nadal w True:
-
-Create item (SharePoint), nazwa Log_saved
-Site Address: BSO FA, List Name: MailRouting_Log
-Kliknij Show all, wtedy pokażą się wszystkie kolumny. Uzupełnij je przez fx:
-Pole	Wyrażenie (fx)
-Title (MessageId)	items('For_each_email')?['internetMessageId']
-Team	outputs('Config')?['Title']
-ReceivedAt	items('For_each_email')?['receivedDateTime']
-MailFrom	items('For_each_email')?['from']
-MailSubject	substring(coalesce(items('For_each_email')?['subject'], ''), 0, min(255, length(coalesce(items('For_each_email')?['subject'], ''))))
-RuleId	outputs('Rule')?['Title']
-Category	outputs('Rule')?['Category']?['Value']
-FilesSaved	length(body('Matching_attachments'))
-FilePaths	outputs('Target_path')
-Status: wybierz z listy Saved. Wyrażenie nie jest tu potrzebne.
-Pola UnmatchedAttachments, Notes, Error i RunLink zostaw na razie puste.
-
-C. Zapamiętanie ostatniego uruchomienia. Na samym końcu flow, pod pętlą For_each_folder, czyli poza wszystkimi pętlami (dolny + na schemacie):
-
-Update item (SharePoint), nazwa Save_last_run
-Site Address: BSO FA, List Name: MailRouting_Config
-Id (fx): outputs('Config')?['ID']
-Pola wymagane muszą być uzupełnione, inaczej Update item zgłosi błąd:
-Team / Title (fx): outputs('Config')?['Title']
-Mailbox (fx): outputs('Config')?['Mailbox']
-BaseFolder (fx): outputs('Config')?['BaseFolder']
-LastRunUtc (fx): outputs('Run_start')
+Punkt 2: indeksy w MailRouting_Log (SharePoint, 2 minuty)
+Otwórz listę MailRouting_Log → ⚙ → List settings.
+Przewiń do sekcji Columns. Pod listą kolumn jest link Indexed columns. Kliknij go.
+Kliknij Create a new index.
+Primary column: wybierz MessageId (to kolumna Title) → kliknij Create.
+Wróć do Indexed columns i znowu kliknij Create a new index.
+Primary column: Status → Create.
+Na stronie Indexed columns mają być widoczne dwa indeksy: MessageId i Status.
+Punkt 1: status NoFiles zamiast Saved z 0 plikami
+a) Nowa opcja w liście (SharePoint)
+MailRouting_Log → ⚙ → List settings → kliknij kolumnę Status.
+W polu z opcjami dopisz w nowej linii: NoFiles. Przy okazji dopisz też NoMatch, przyda się w punkcie 5. Pole ma wyglądać tak:
+Saved
+NoMatch
+TestMatch
+Error
+NoFiles
+Kliknij OK.
+b) Zmiana w akcji Log_saved (Power Automate)
+Kliknij Log saved.
+Przy Status Value kliknij X, żeby usunąć „Saved”.
+Kliknij w to pole i rozwiń listę. Na dole listy wybierz Enter custom value. Potem kliknij fx, wklej wyrażenie i kliknij Add:
+if(greater(length(body('Matching_attachments')), 0), 'Saved', 'NoFiles')
+c) Zmiana w akcji Get_log_entry
+Teraz flow ma pomijać mail, który ma w logu jakikolwiek wpis, a nie tylko Saved. Dzięki temu NoFiles i NoMatch nie będą się dublować.
+Kliknij Get log entry.
+W Filter Query kliknij X przy obecnym wyrażeniu, potem fx, wklej i kliknij Add:
+concat('Title eq ''', replace(items('For_each_email')?['internetMessageId'], '''', ''''''), '''')
+Punkt 3: wyłącznik Active w Config
+a) Save_last_run nie może nadpisywać Active
+Kliknij Save last run.
+Przy polu Active kliknij X po prawej stronie pola. Pole ma zniknąć albo zostać puste.
+b) Flow ma sprawdzać, czy team jest aktywny
+Kliknij + między Config a Get rules → Add an action → Condition. Zmień nazwę na Team_active.
+Warunek:
+lewa strona przez fx: outputs('Config')?['Active']
+operator: is equal to
+prawa strona: fx → true. Musi być wpisane przez fx, a nie zwykłym tekstem, bo inaczej porówna z napisem „true”.
+Gałąź True zostaw pustą.
+W gałęzi False kliknij + → wyszukaj Terminate → Status: Succeeded.
+Jeśli w Config ustawisz Active = No, flow zakończy się od razu i niczego nie zrobi.
+Punkt 5: log NoMatch
+W Has_match, w gałęzi False (czerwonej):
++ → Condition, nazwa Not_logged_yet:
+lewa strona (fx): length(body('Get_log_entry'))
+is equal to
+prawa strona: 0
+Bez tego warunku maile, które już były w logu, trafiałyby tu ponownie.
+W gałęzi True tego warunku: + → Create item (SharePoint), nazwa Log_nomatch.
+Site Address: BSO FA, List Name: MailRouting_Log, kliknij Show all.
+Wypełnij przez fx:
+Pole
+Wyrażenie (fx)
+MessageId
+items('For_each_email')?['internetMessageId']
+Team
+outputs('Config')?['Title']
+ReceivedAt
+items('For_each_email')?['receivedDateTime']
+MailFrom
+items('For_each_email')?['from']
+MailSubject
+substring(coalesce(items('For_each_email')?['subject'], ''), 0, min(255, length(coalesce(items('For_each_email')?['subject'], ''))))
+Status Value: wybierz z listy NoMatch.
+Pozostałe pola zostaw puste.
+Gałąź False warunku Not_logged_yet zostaw pustą.
+Po kilku dniach w logu z filtrem Status = NoMatch zobaczysz maile z obserwowanych folderów, których żadna reguła nie złapała.
+Punkt 6: mail, gdy flow się wywróci
+Pod Save last run (na samym dole) kliknij + → wyszukaj Send an email (V2) (Office 365 Outlook). Zmień nazwę na Notify_error.
+To: Twój adres służbowy (zwykły tekst).
+Subject (zwykły tekst): MailRouting Team 9 – flow failed
+Body: wpisz tekst Flow run failed. Run link: , a za nim przez fx dodaj:
+concat('https://make.powerautomate.com/environments/', workflow()?['tags']?['environmentName'], '/flows/', workflow()?['name'], '/runs/', workflow()?['run']?['name'])
+Kiedy ma się uruchamiać. W panelu Notify_error otwórz zakładkę Settings. Znajdź sekcję Run after i rozwiń Save_last_run:
+odznacz Is successful,
+zaznacz Has failed, Is skipped i Has timed out.
+Jeśli pętla się wywróci, Save_last_run jest pomijany, więc mail wyjdzie. Jeśli wszystko pójdzie dobrze, mail nie wyjdzie.
+Pod Notify_error: + → Terminate, Status: Failed. Dzięki temu nieudany przebieg nadal będzie oznaczony na czerwono w historii.
+Test po zmianach
+Save, potem Test → Manually → Run flow. Przebieg ma być zielony. Mail Notify_error nie powinien przyjść.
+Test Active: w Config ustaw Active = No i uruchom test. Flow powinien zakończyć się od razu po Team_active. Potem ustaw Active = Yes z powrotem.
+Test powiadomienia (opcjonalnie): w regule zmień na chwilę SourceFolder na błędny tekst, np. dopisz X na końcu, i uruchom test. Get emails się wywróci, a Ty powinieneś dostać maila z linkiem. Potem przywróć poprawne ID.
+Turn on.
+Wyślij zdjęcia przy Team_active (punkt 3b) i przy Run after (punkt 6). Te dwa miejsca najłatwiej źle kliknąć.
