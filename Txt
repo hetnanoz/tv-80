@@ -1,1 +1,24 @@
-@and(not(equals(item()?['isInline'], true)), or(empty(outputs('Rule')?['AttNameValue']), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'Equals'), equals(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'Contains'), contains(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'StartsWith'), startsWith(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'EndsWith'), endsWith(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], '')))))), or(empty(outputs('Rule')?['AttExtensions']), contains(concat(';', replace(toLower(coalesce(outputs('Rule')?['AttExtensions'], '')), ' ', ''), ';'), concat(';', if(empty(item()?['contentBytes']), 'msg', last(split(toLower(item()?['name']), '.'))), ';'))))
+B2. Rozgałęzienie w pętli For each attachment
+Kliknij + nad File name, na samej górze wnętrza pętli, i wybierz Condition. Nazwa: Is_embedded_mail.
+Lewa strona (fx): empty(items('For_each_attachment')?['contentBytes'])
+Operator: is equal to
+Prawa strona (fx): true
+Przeciągnij File name i Save file do gałęzi False.
+W gałęzi True dodaj po kolei trzy akcje:
+a) Send an HTTP request (z sekcji Office 365 Outlook), nazwa Get_embedded_mail
+Method: GET
+URI (fx):
+concat('https://graph.microsoft.com/v1.0/users/', outputs('Config')?['Mailbox'], '/messages/', items('For_each_email')?['id'], '/attachments/', items('For_each_attachment')?['id'], '/$value')
+b) Compose, nazwa Embedded_file_name (fx):
+concat(take(replace(replace(replace(replace(replace(replace(replace(replace(replace(coalesce(items('For_each_attachment')?['name'], 'mail'), '"', ''), '*', ''), ':', ''), '<', ''), '>', ''), '?', ''), '/', ''), '\', ''), '|', ''), 100), '_', formatDateTime(outputs('Local_received'), 'yyyyMMdd-HHmmss'), '.eml')
+c) Create file (SharePoint), nazwa Save_embedded_mail
+Site Address: BSO FA
+Folder Path (fx): outputs('Target_path')
+File Name (fx): outputs('Embedded_file_name')
+File Content (fx): body('Get_embedded_mail')
+Wnętrze pętli powinno teraz wyglądać tak:
+For each attachment
+ └ Is embedded mail
+     ├ True:  Get embedded mail → Embedded file name → Save embedded mail
+     └ False: File name → Save file
+B3. Kliknij Save.
