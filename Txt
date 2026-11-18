@@ -1,24 +1,20 @@
-B2. Rozgałęzienie w pętli For each attachment
-Kliknij + nad File name, na samej górze wnętrza pętli, i wybierz Condition. Nazwa: Is_embedded_mail.
-Lewa strona (fx): empty(items('For_each_attachment')?['contentBytes'])
-Operator: is equal to
-Prawa strona (fx): true
-Przeciągnij File name i Save file do gałęzi False.
-W gałęzi True dodaj po kolei trzy akcje:
-a) Send an HTTP request (z sekcji Office 365 Outlook), nazwa Get_embedded_mail
+1. Send an HTTP request (Office 365 Outlook), nazwa List_attachments
 Method: GET
 URI (fx):
-concat('https://graph.microsoft.com/v1.0/users/', outputs('Config')?['Mailbox'], '/messages/', items('For_each_email')?['id'], '/attachments/', items('For_each_attachment')?['id'], '/$value')
-b) Compose, nazwa Embedded_file_name (fx):
-concat(take(replace(replace(replace(replace(replace(replace(replace(replace(replace(coalesce(items('For_each_attachment')?['name'], 'mail'), '"', ''), '*', ''), ':', ''), '<', ''), '>', ''), '?', ''), '/', ''), '\', ''), '|', ''), 100), '_', formatDateTime(outputs('Local_received'), 'yyyyMMdd-HHmmss'), '.eml')
-c) Create file (SharePoint), nazwa Save_embedded_mail
-Site Address: BSO FA
-Folder Path (fx): outputs('Target_path')
-File Name (fx): outputs('Embedded_file_name')
-File Content (fx): body('Get_embedded_mail')
-Wnętrze pętli powinno teraz wyglądać tak:
-For each attachment
- └ Is embedded mail
-     ├ True:  Get embedded mail → Embedded file name → Save embedded mail
-     └ False: File name → Save file
-B3. Kliknij Save.
+concat('https://graph.microsoft.com/v1.0/users/', outputs('Config')?['Mailbox'], '/messages/', items('For_each_email')?['id'], '/attachments?$select=id,name,isInline,contentType')
+2. Filter array, nazwa Item_attachments (wybiera tylko załączone maile)
+From (fx): body('List_attachments')?['value']
+Edit in advanced mode:
+@equals(item()?['@odata.type'], '#microsoft.graph.itemAttachment')
+3. Filter array, nazwa File_attachments (zwykłe pliki z Get emails)
+From (fx): items('For_each_email')?['attachments']
+Edit in advanced mode:
+@not(empty(item()?['contentBytes']))
+4. Matching attachments: zmiana źródła
+Kliknij Matching attachments. W polu From usuń obecne wyrażenie (X) i wpisz przez fx:
+union(body('File_attachments'), body('Item_attachments'))
+Warunku w advanced mode nie zmieniaj. Już rozpoznaje załączone maile jako msg.
+Kolejność w gałęzi True ma wyglądać tak:
+Rule → Local received → Shifted date → Processing date → Target path
+→ List attachments → Item attachments → File attachments → Matching attachments → For each attachment → Log saved
+Kliknij Save.
