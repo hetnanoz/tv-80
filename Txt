@@ -1,1 +1,19 @@
-concat('Title eq ''', replace(items('For_each_email')?['internetMessageId'], '''', ''''''), '''')
+1. Has match, drugi wiersz
+
+Kliknij Has match.
+W drugim wierszu (lewa strona, length(body('Get_log_entry'))) kliknij X.
+Kliknij w puste pole → fx, wklej poniższe wyrażenie i kliknij Add:
+length(body('Get_log_entry')?['value'])
+Pierwszy wiersz (length(body('Rule_candidates'))) zostaw bez zmian. Filter array zwraca od razu tablicę, więc tam wszystko jest dobrze.
+
+2. Not logged yet (w gałęzi False pod Has match)
+
+Kliknij Not logged yet.
+Lewą stronę warunku zamień w ten sam sposób na:
+length(body('Get_log_entry')?['value'])
+
+Potem Save → Test → Manually → Run flow i sprawdź to samo co ostatnio:
+
+czy na SharePoincie w POC- power automate inx/Contract Notes są Contract Notes z poniedziałku i wtorku,
+czy w MailRouting_Log są wpisy Saved i NoMatch,
+czy w MailRouting_Config zaktualizowało się LastRunUtc.
