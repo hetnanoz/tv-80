@@ -1,20 +1,32 @@
-1. Send an HTTP request (Office 365 Outlook), nazwa List_attachments
-Method: GET
-URI (fx):
-concat('https://graph.microsoft.com/v1.0/users/', outputs('Config')?['Mailbox'], '/messages/', items('For_each_email')?['id'], '/attachments?$select=id,name,isInline,contentType')
-2. Filter array, nazwa Item_attachments (wybiera tylko załączone maile)
-From (fx): body('List_attachments')?['value']
-Edit in advanced mode:
-@equals(item()?['@odata.type'], '#microsoft.graph.itemAttachment')
-3. Filter array, nazwa File_attachments (zwykłe pliki z Get emails)
-From (fx): items('For_each_email')?['attachments']
-Edit in advanced mode:
-@not(empty(item()?['contentBytes']))
-4. Matching attachments: zmiana źródła
-Kliknij Matching attachments. W polu From usuń obecne wyrażenie (X) i wpisz przez fx:
-union(body('File_attachments'), body('Item_attachments'))
-Warunku w advanced mode nie zmieniaj. Już rozpoznaje załączone maile jako msg.
-Kolejność w gałęzi True ma wyglądać tak:
-Rule → Local received → Shifted date → Processing date → Target path
-→ List attachments → Item attachments → File attachments → Matching attachments → For each attachment → Log saved
-Kliknij Save.
+Krok 0: indeks w logu (SharePoint)
+MailRouting_Log → ⚙ → List settings → Indexed columns → Create a new index → Primary column: ReceivedAt → Create.
+Krok 1: usuń stare elementy
+Wewnątrz For each email usuń akcję Get log entry (… → Delete).
+W Has match usuń drugi wiersz (length(body('Get_log_entry')?['value'])). Zostaje tylko length(body('Rule_candidates')) is greater than 0.
+W gałęzi False w Has match usuń Not logged yet. Razem z nim zniknie Log nomatch. Gałąź False zostaje pusta.
+Krok 2: dodaj sprawdzanie raz na przebieg
+Dodajesz przez + między Since a For each folder, czyli przed pętlami.
+a) Get items (SharePoint), nazwa Get_recent_log
+Site Address: BSO FA, List Name: MailRouting_Log
+Filter Query (fx):
+concat('ReceivedAt ge ''', formatDateTime(outputs('Since'), 'yyyy-MM-ddTHH:mm:ssZ'), '''')
+Top Count: 1000
+b) Select (Data Operation), nazwa Logged_ids
+From (fx): body('Get_recent_log')?['value']
+Map: przełącz na tryb tekstowy (ikona obok pola Map), a potem przez fx wpisz item()?['Title'].
+Krok 3: nowy filtr w New emails
+Kliknij New emails (wewnątrz For each folder), potem Edit in advanced mode. Usuń obecne wyrażenie i wklej:
+@and(greater(ticks(item()?['receivedDateTime']), ticks(outputs('Since'))), not(contains(body('Logged_ids'), item()?['internetMessageId'])))
+Od teraz do pętli For each email trafiają tylko maile, których jeszcze nie ma w logu.
+Krok 4: Recurrence
+Interval: 30 minut
+Settings → Concurrency control: On, Degree of parallelism: 1
+Na koniec kliknij Save.
+Kolejność na schemacie
+… Since → Get recent log → Logged ids → For each folder
+   Get emails → New emails → For each email
+      Rule candidates → Has match
+         True: Rule … Log saved
+         False: (pusto)
+→ Save last run → Notify error → Terminate
+Test
