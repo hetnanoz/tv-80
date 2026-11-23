@@ -1,4 +1,4 @@
-A. SharePoint
+żA. SharePoint
 
 1. MailRouting_Rules → List settings → SourceFolder: zmień typ na Multiple lines of text, ustaw Plain text, kliknij OK.
 2. MailRouting_Rules → kolumna Team: dopisz opcję Team 10.
@@ -57,14 +57,7 @@ concat('ReceivedAt ge ''', formatDateTime(outputs('Since'), 'yyyy-MM-ddTHH:mm:ss
 union(split(join(body('Folder_list'), ';'), ';'), split(join(body('Folder_list'), ';'), ';'))
 
 9. Rule candidates → Edit in advanced mode
-Na początku wyrażenia zamień fragment:
-
-equals(item()?['SourceFolder'], items('For_each_folder'))
-
-na:
-
-contains(concat(';', item()?['SourceFolder'], ';'), concat(';', items('For_each_folder'), ';'))
-
+@and(contains(concat(';', item()?['SourceFolder'], ';'), concat(';', items('For_each_folder'), ';')), not(equals(item()?['TestMode'], true)), or(empty(item()?['SenderValue']), and(equals(item()?['SenderMatchType']?['Value'], 'Equals'), equals(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'Contains'), contains(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'StartsWith'), startsWith(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'EndsWith'), endsWith(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'Domain'), endsWith(toLower(coalesce(items('For_each_email')?['from'], '')), concat('@', toLower(trim(coalesce(item()?['SenderValue'], ''))))))), or(empty(item()?['SubjectValue']), and(equals(item()?['SubjectMatchType']?['Value'], 'Equals'), equals(toLower(trim(coalesce(items('For_each_email')?['subject'], ''))), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'Contains'), contains(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'StartsWith'), startsWith(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'EndsWith'), endsWith(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], '')))))))
 10. Notify error → Settings → Run after
 Notify error był dotąd powiązany z Save last run, który teraz siedzi w pętli. Trzeba go więc podpiąć na nowo:
 
