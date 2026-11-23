@@ -1,87 +1,24 @@
-żA. SharePoint
+Subject: RE: Power Automate - call deposit T10
 
-1. MailRouting_Rules → List settings → SourceFolder: zmień typ na Multiple lines of text, ustaw Plain text, kliknij OK.
-2. MailRouting_Rules → kolumna Team: dopisz opcję Team 10.
-3. MailRouting_Rules → kolumna Category: dopisz opcję Call deposit.
-4. MailRouting_Config → + New:
-   ◦ Team: Team 10
-   ◦ Mailbox: frankfurt.fa10@bnpparibas.com
-   ◦ BaseFolder: taki sam jak dla Team 9
-   ◦ Active: Yes
-   ◦ LastRunUtc: 2026-11-20T00:00:00Z
+Hej Aneta,
 
-B. Flow
+flow dla Waszego teamu już działa. Maile Tagesgeld od BayernInvest z obu folderów Waszej skrzynki zapisują się automatycznie (co 30 minut) w folderze SharePoint:
+BAU documents > POC- power automate inx > Call deposits - T10
 
-Najpierw kliknij Turn off, potem Edit.
+Po krótce, jak to jest ustawione (w załączeniu screeny):
 
-1. Get config
+1. MailRouting_Config – jednorazowe ustawienie dla teamu: adres skrzynki (frankfurt.fa10@...) i główny folder na SharePoincie.
+2. MailRouting_Rules – jedna reguła na typ maila (na liście + New). W regule wpisuje się m.in.:
+   • nadawcę: cashmanagement@bayerninvest.de
+   • fragment tematu: Tagesgeld
+   • typ załączników: xlsx
+   • folder w Outlooku, z którego brać maile, i podfolder docelowy na SharePoincie: Call deposits - T10
 
-• Filter Query: Active eq 1
-• Top Count: wyczyść, żeby pole było puste.
+Listy znajdziesz na site'cie BSO FA: ⚙ → Site contents.
 
-2. Usuń warunek Team active
-Kliknij … → Delete. Razem z nim zniknie Terminate z jego gałęzi False. Ten warunek nie jest już potrzebny, bo nieaktywne teamy odfiltruje już Get config.
+Na razie wolałbym, żeby reguły zakładać po mojej stronie. Rozwiązanie jest jeszcze w fazie rozwojowej i czasem coś wymaga poprawki, a jedna źle dodana albo usunięta reguła może zatrzymać całe flow dla wszystkich teamów. Do tego ID folderu w Outlooku pobiera się osobnym flow – samo w sobie to nic trudnego, ale szybciej będzie, jeśli zrobię to sam, niż tłumaczył każdemu po kolei.
 
-3. Dodaj pętlę po teamach
+Jeśli pojawią się kolejne typy maili do zapisywania, po prostu daj znać – dorzucę regułę. A jak będziesz chciała zobaczyć, jak to wygląda od środka, napisz, zdzwonimy się i chętnie pokażę.
 
-• Kliknij + pod Get config i dodaj Apply to each. Nazwij ją For_each_team.
-• Input (fx):
-body('Get_config')?['value']
-• Przejdź do Settings → Concurrency control: On, Degree of parallelism: 1. Teamy będą wtedy obsługiwane po kolei, a nie jednocześnie.
-
-4. Przenieś akcje do pętli
-Przeciągnij do środka For_each_team, zachowując tę kolejność:
-
-Config → Get rules → Folder list → Unique folders → Since → Get recent log → Logged ids → For each folder → Save last run
-• Całą pętlę For each folder przenosisz, łapiąc ją za nagłówek.
-• Run start zostaje na samej górze, nad Get config.
-• Notify error i Terminate zostają na dole, pod pętlą For each team.
-
-5. Config
-Usuń obecne wyrażenie i wpisz przez fx:
-
-items('For_each_team')
-
-Od teraz wszystkie dotychczasowe wyrażenia outputs('Config')… będą automatycznie dotyczyć bieżącego teamu.
-
-6. Get rules → Filter Query (fx):
-
-concat('Team eq ''', outputs('Config')?['Title'], ''' and Active eq 1')
-
-7. Get recent log → Filter Query (fx):
-
-concat('ReceivedAt ge ''', formatDateTime(outputs('Since'), 'yyyy-MM-ddTHH:mm:ssZ'), ''' and Team eq ''', outputs('Config')?['Title'], '''')
-
-8. Unique folders (fx):
-
-union(split(join(body('Folder_list'), ';'), ';'), split(join(body('Folder_list'), ';'), ';'))
-
-9. Rule candidates → Edit in advanced mode
-@and(contains(concat(';', item()?['SourceFolder'], ';'), concat(';', items('For_each_folder'), ';')), not(equals(item()?['TestMode'], true)), or(empty(item()?['SenderValue']), and(equals(item()?['SenderMatchType']?['Value'], 'Equals'), equals(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'Contains'), contains(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'StartsWith'), startsWith(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'EndsWith'), endsWith(toLower(coalesce(items('For_each_email')?['from'], '')), toLower(trim(coalesce(item()?['SenderValue'], ''))))), and(equals(item()?['SenderMatchType']?['Value'], 'Domain'), endsWith(toLower(coalesce(items('For_each_email')?['from'], '')), concat('@', toLower(trim(coalesce(item()?['SenderValue'], ''))))))), or(empty(item()?['SubjectValue']), and(equals(item()?['SubjectMatchType']?['Value'], 'Equals'), equals(toLower(trim(coalesce(items('For_each_email')?['subject'], ''))), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'Contains'), contains(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'StartsWith'), startsWith(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], ''))))), and(equals(item()?['SubjectMatchType']?['Value'], 'EndsWith'), endsWith(toLower(coalesce(items('For_each_email')?['subject'], '')), toLower(trim(coalesce(item()?['SubjectValue'], '')))))))
-10. Notify error → Settings → Run after
-Notify error był dotąd powiązany z Save last run, który teraz siedzi w pętli. Trzeba go więc podpiąć na nowo:
-
-• Usuń dotychczasowe powiązanie z Save last run.
-• Ustaw For_each_team: zaznacz Has failed i Has timed out, odznacz Is successful.
-• Subject zmień na MailRouting – flow failed.
-
-11. Save
-Opcjonalnie zmień też nazwę flow na Mail_Routing_Router (All teams) w Details → Edit.
-
-C. Reguła dla Team 10
-
-Wpisz ją tak jak w poprzedniej wiadomości (FA10-CALLDEP-01, oba ID folderów oddzielone ;, TargetFolder Call deposits - T10). Reguł Team 9 nie zmieniasz, bo pojedyncze ID nadal działa.
-
-Oba ID folderów pobierz tymczasowym flow z Original Mailbox Address = frankfurt.fa10@bnpparibas.com.
-
-D. Test
-
-1. Test → Run flow.
-2. W przebiegu pętla For each team powinna pokazywać 2 iteracje: Team 9 i Team 10.
-3. Sprawdź, czy:
-   ◦ w Call deposits - T10 pojawiły się pliki z ostatnich dni,
-   ◦ w Config oba teamy mają zaktualizowane LastRunUtc,
-   ◦ Team 9 działa tak jak wcześniej.
-4. Turn on.
-
-Jeśli w Team 10 Get emails zwróci błąd uprawnień, Twoje konto nie ma dostępu do skrzynki FA10. Trzeba wtedy o niego poprosić.
+Pozdrawiam,
+Paweł
