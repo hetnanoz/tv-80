@@ -1,42 +1,38 @@
-Krok 1: Get emails (wewnątrz For each folder)
+2. Akcje (każdą dodajesz pod poprzednią)
 
-• Include Attachments: No
-• Search Query (w Advanced parameters, jeśli jest; fx):
-concat('received>=', formatDateTime(outputs('Since'), 'yyyy-MM-dd'))
+a) Get items (SharePoint), nazwa Get_config
 
-Jeśli pola Search Query nie ma, pomiń je. Wyłączenie załączników jest tu najważniejsze.
+• Site Address: BSO FA
+• List Name: MailRouting_Config
+• Filter Query (zwykły tekst): Active eq 1
 
-Krok 2: gałąź True w Has match
+b) Filter array, nazwa Stale_teams
 
-1. Usuń akcje Item attachments i File attachments.
-2. Matching attachments → From (usuń X, wpisz przez fx):
-body('List_attachments')?['value']
-3. Matching attachments → Edit in advanced mode: usuń całe wyrażenie i wklej:
-@and(not(equals(item()?['isInline'], true)), or(empty(outputs('Rule')?['AttNameValue']), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'Equals'), equals(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'Contains'), contains(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'StartsWith'), startsWith(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], ''))))), and(equals(outputs('Rule')?['AttNameMatchType']?['Value'], 'EndsWith'), endsWith(toLower(item()?['name']), toLower(trim(coalesce(outputs('Rule')?['AttNameValue'], '')))))), or(empty(outputs('Rule')?['AttExtensions']), contains(concat(';', replace(toLower(coalesce(outputs('Rule')?['AttExtensions'], '')), ' ', ''), ';'), concat(';', if(equals(item()?['@odata.type'], '#microsoft.graph.itemAttachment'), 'msg', last(split(toLower(item()?['name']), '.'))), ';'))))
+• From (fx): body('Get_config')?['value']
+• Edit in advanced mode:
+@or(empty(item()?['LastRunUtc']), less(ticks(item()?['LastRunUtc']), ticks(addHours(utcNow(), -2))))
 
-Krok 3: For each attachment
+c) Select, nazwa Stale_list
 
-a) Is embedded mail. Zmień lewą stronę warunku (fx):
+• From (fx): body('Stale_teams')
+• Map: przełącz na tryb tekstowy i wpisz (fx):
+concat(item()?['Title'], ' – last successful run: ', if(empty(item()?['LastRunUtc']), 'never', convertFromUtc(item()?['LastRunUtc'], 'Central European Standard Time', 'yyyy-MM-dd HH:mm')))
 
-equals(items('For_each_attachment')?['@odata.type'], '#microsoft.graph.itemAttachment')
+d) Condition, nazwa Any_stale
 
-Operator is equal to, prawa strona (fx) true, bez zmian.
+• lewa strona (fx): length(body('Stale_teams'))
+• is greater than
+• prawa strona: 0
 
-b) Gałąź False: zwykłe pliki. Między File name a Save file dodaj Send an HTTP request (Office 365 Outlook) o nazwie Get_file_content:
+e) W gałęzi True: Send an email (V2), nazwa Notify_stale
 
-• Method: GET
-• URI (fx):
-concat('https://graph.microsoft.com/v1.0/users/', outputs('Config')?['Mailbox'], '/messages/', items('For_each_email')?['id'], '/attachments/', items('For_each_attachment')?['id'], '/$value')
+• To: Twój adres
+• Subject: MailRouting nie działa
+• Body: wpisz tekst Brak udanego przebiegu od ponad 2 godzin: i Enter, a dalej przez fx:
+join(body('Stale_list'), '<br>')
 
-Potem w Save file zmień File Content (usuń X, fx):
+Na końcu możesz dopisać zwykłym tekstem link do strony głównego flow (skopiuj adres z przeglądarki, gdy jesteś na jego stronie Details). Wtedy z maila przejdziesz od razu do historii przebiegów.
 
-body('Get_file_content')
+Gałąź False zostaw pustą. Kliknij Save.
 
-Gałąź True (Get embedded mail itd.) zostaje bez zmian.
-
-Krok 4: zapis i test
-
-1. Save.
-2. Test → Run flow. LastRunUtc stoi na ostatnim udanym przebiegu, więc flow nadrobi maile od nocy.
-3. Sprawdź, czy przebieg jest zielony i trwa kilka minut, czy w folderach SharePoint pojawiły się pliki z dzisiaj (.xlsx, .pdf, .doc), i czy pliki się otwierają. Szczególnie zwróć uwagę na Excele.
-4. Turn on.
+3. Test
