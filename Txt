@@ -1,110 +1,23 @@
-// Office Script: ATG_Parse
-// Czyta tabelę z maila "ATG's today!" (HTML) i zwraca wszystkie wiersze z kolorem tła.
-// Wywołanie z Power Automate: Excel Online (Business) -> Run script from SharePoint library
-// Parametry: html = treść maila (HTML), team9Colors = "00b050" (kilka kodów po przecinku), targetTeam = "9"
-// Klucz deduplikacji: Funds-No + Process-Day + Event, np. F03469_2026-11-25_ATG
+Dobrze, że pytasz, bo są tu dwie różne rzeczy:
+• W **Filter Query** zmień `ATGKey` na **`AtgKey`**, czyli dokładnie tak, jak nazywa się kolumna w liście (duże A, małe tg, duże K). SharePoint rozróżnia tu wielkość liter.
+• W wyrażeniu `items('Loop_Team_9_rows')?['atgKey']` zostaw małe **a**. To nazwa pola, którą zwraca skrypt, a nie kolumna w liście.
 
-interface AtgRow {
-  atgKey: string;      // F03469_2026-11-25_ATG
-  processDay: string;  // yyyy-MM-dd
-  navDate: string;     // yyyy-MM-dd
-  fundsNo: string;
-  fundsName: string;
-  fundCat: string;
-  kvg: string;
-  event: string;
-  status: string;
-  team: string;
-  rowColor: string;    // np. 00b050
-  teamSource: string;  // Column | Color
-  isTeam9: boolean;
-}
+Reszta wygląda dobrze. W **Check new row** jest znowu pusty drugi wiersz, więc go usuń.
 
-function main(workbook: ExcelScript.Workbook, html: string, team9Colors: string, targetTeam: string): AtgRow[] {
-  const colors = team9Colors.toLowerCase().split(",").map(c => c.trim().replace("#", "")).filter(c => c.length > 0);
-  const trRe = /<tr\b([^>]*)>([\s\S]*?)<\/tr>/gi;
-  const result: AtgRow[] = [];
-  let header: string[] = [];
-  let m: RegExpExecArray | null;
+**Następny krok, gałąź True w Check new row:**
+**+** → **Create item** (SharePoint), Rename → **Create checklist item**. Site: BSO FA, List: ATG Checklist T9. Pojawią się pola kolumn i każde wypełnij przez fx:
+• Title: `items('Loop_Team_9_rows')?['fundsNo']`
+• AtgKey: `items('Loop_Team_9_rows')?['atgKey']`
+• ProcessDay: `concat(items('Loop_Team_9_rows')?['processDay'], 'T12:00:00Z')`
+• NavDate: `if(empty(items('Loop_Team_9_rows')?['navDate']), null, concat(items('Loop_Team_9_rows')?['navDate'], 'T12:00:00Z'))`
+• FundsName: `items('Loop_Team_9_rows')?['fundsName']`
+• FundCat: `items('Loop_Team_9_rows')?['fundCat']`
+• KVG: `items('Loop_Team_9_rows')?['kvg']`
+• AtgEvent: `items('Loop_Team_9_rows')?['event']`
+• TeamSource Value: `items('Loop_Team_9_rows')?['teamSource']`
+• RowColor: `items('Loop_Team_9_rows')?['rowColor']`
+• FirstSeenAt: `utcNow()`
+• SourceSubject: `triggerOutputs()?['body/subject']`
+• FromUpdate: `contains(toUpper(triggerOutputs()?['body/subject']), 'UPDATE')`
 
-  while ((m = trRe.exec(html)) !== null) {
-    const cells: string[] = [];
-    const tdRe = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let c: RegExpExecArray | null;
-    while ((c = tdRe.exec(m[2])) !== null) {
-      cells.push(cleanText(c[1]));
-    }
-    if (cells.length === 0) continue;
-
-    const norm = cells.map(x => x.toLowerCase().replace(/[^a-z0-9]/g, ""));
-    if (norm.indexOf("fundsno") >= 0 && norm.indexOf("processday") >= 0) {
-      header = norm;            // wiersz nagłówka
-      continue;
-    }
-    if (header.length === 0) continue;
-
-    const get = (name: string): string => {
-      const i = header.indexOf(name);
-      return i >= 0 && i < cells.length ? cells[i] : "";
-    };
-    const pd = get("processday");
-    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(pd)) continue;  // tylko wiersze z datą
-
-    const color = findColor(m[0]);
-    const hasTeamCol = header.indexOf("team") >= 0;
-    const team = get("team");
-    let isTeam9 = false;
-    let source = "";
-    if (hasTeamCol && team !== "") {
-      isTeam9 = team === targetTeam;
-      source = "Column";
-    } else {
-      isTeam9 = colors.indexOf(color) >= 0;
-      source = "Color";
-    }
-
-    const fundsNo = get("fundsno");
-    const ev = get("event");
-    result.push({
-      atgKey: fundsNo + "_" + toIso(pd) + "_" + ev.toUpperCase(),
-      processDay: toIso(pd),
-      navDate: toIso(get("navdate")),
-      fundsNo: fundsNo,
-      fundsName: get("fundsname"),
-      fundCat: get("fundcat"),
-      kvg: get("kvg"),
-      event: ev,
-      status: get("status"),
-      team: team,
-      rowColor: color,
-      teamSource: source,
-      isTeam9: isTeam9
-    });
-  }
-  return result;
-}
-
-function cleanText(s: string): string {
-  return s.replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&#(\d+);/g, (_x: string, d: string) => String.fromCharCode(parseInt(d, 10)))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function findColor(rowHtml: string): string {
-  const r = rowHtml.match(/(?:bgcolor\s*=\s*["']?|background(?:-color)?\s*:\s*)(rgb\([^)]*\)|#?[0-9a-z]+)/i);
-  if (!r) return "";
-  const v = r[1].toLowerCase();
-  if (v.indexOf("rgb") === 0) {
-    const n = v.replace(/[^0-9,]/g, "").split(",").map(x => parseInt(x, 10));
-    return n.slice(0, 3).map(x => ("0" + x.toString(16)).slice(-2)).join("");
-  }
-  return v.replace("#", "");
-}
-
-function toIso(d: string): string {
-  const p = d.split(".");
-  return p.length === 3 ? p[2] + "-" + p[1] + "-" + p[0] : "";
-}
+Pozostałe pola (Booked, Doer itd.) zostaw puste. Niektóre z nich mogą być schowane w Advanced parameters, wtedy kliknij **Show all**.
